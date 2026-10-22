@@ -53,7 +53,7 @@ blanks, there is no quoting and no variable assignment; only `>> FILE` and a tra
 
 ## Licenses
 
-A license for our own code here is not chosen yet: until a LICENSE file appears, all rights are reserved by OOSEX GANG. Mesa (MIT) is not in the
+Our code in this repository is released under the [MIT License](LICENSE). Mesa (MIT) is not in the
 repository: `tools/mk-mesa.sh` fetches release 25.0.7, `tools/mesa/*.patch` are our changes to it. apfsprogs
 (GPL-2.0) is not in the repository either: `tools/apfs/check-image.sh` fetches and builds only `apfsck`.
 
