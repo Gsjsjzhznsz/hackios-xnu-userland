@@ -1002,6 +1002,13 @@ send_button(IOHIDServiceClientRef buttons, const struct redwood_touch *t)
 	if (usage == 0) {
 		return;
 	}
+	/* A witness of the last hop: the R14 volume-key question is "did the event reach the
+	 * event system", and only a line per button says so (buttons are rare; touch is the
+	 * firehose and stays as it is). */
+	say("redwood: input: button %s %s (page %#x, usage %#x)\n",
+	    t->finger == REDWOOD_BUTTON_LOCK ? "lock" : t->finger == REDWOOD_BUTTON_VOLUME_UP ? "volume up" :
+	    t->finger == REDWOOD_BUTTON_VOLUME_DOWN ? "volume down" : t->finger == REDWOOD_BUTTON_HOME ? "home" : "?",
+	    t->type == REDWOOD_BUTTON_DOWN ? "DOWN" : "up", HID_PAGE_CONSUMER, usage);
 	if (t->finger == REDWOOD_BUTTON_LOCK) {
 		publish_lock_button(t->type == REDWOOD_BUTTON_DOWN);
 	}
@@ -1076,7 +1083,7 @@ input_thread(__unused void *arg)
 	while (read(device, &t, sizeof(t)) == (ssize_t)sizeof(t)) {
 		uint64_t read_at = mach_absolute_time();
 
-		if (count++ < 4) {
+		if (count++ < 4 || t.type > REDWOOD_TOUCH_UP) {
 			say("redwood: input: sample type %u finger %u at %u %u\n", t.type, t.finger, t.x, t.y);
 		}
 		if (t.type > REDWOOD_TOUCH_UP) {
