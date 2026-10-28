@@ -1,0 +1,37 @@
+# Commands run by the launchd job com.redwood.demo (RC_JOBS=rc.jobs.r36metal).
+#
+# R36, the J3-closing round, on the phone: the volume, the cmdline and the GL+Metal pieces
+# ride R35's bytes STILL -- the ONE variable this round ships is sbin/init (userland pin
+# a5ef0c3): its flash_root now union-binds this image's own /System/Library/Extensions over
+# the iOS volume's, so the RedwoodMetal.bundle link stands beside Apple's AGX bundles at the
+# exact path Metal's discovery step 3 composes (R35's log: "Metal would open
+# /System/Library/Extensions/RedwoodMetal.bundle: NOT THERE" -- the link rode only inside
+# /redwood, which the framework never looks at).
+#
+# The commands here are R35's rc.jobs.r35metal VERBATIM, deliberately: metal_test's step 3
+# IS the union verdict (the bundle opens from the root = the mount worked; "NOT THERE" =
+# J3 again, and the init log's own line -- "our Metal plug-in beside iOS's own, where
+# Metal's discovery opens it" or a "bindfs union ... : ..." failure -- names which).  One
+# variable per round: not the test list, the init.
+#
+#   - the wait first: SpringBoard up, the window server holding the GPU, the system calm
+#     (rc.jobs.r35metal's own comment carries the full reasoning: a discovery property put
+#     on the service while daemons still start hands each of them a device of ours the
+#     moment it asks, and a daemon handed a device that cannot serve it aborts -- a loop).
+#     Nothing here persists: the properties live only in the registry.
+#
+#   - metal_props puts the two discovery properties on the IOAcceleratorES service (the
+#     kernel must be booted with metal=1 to accept them: iokit/Kernel/MiniIOMobileFramebuffer.cpp).
+#
+#   - metal_test walks the five steps on the record: the service, the two properties, the
+#     bundle (NOW at the root -- this round's point), the class under _MTLDevice, the
+#     device -- then asks CoreImage to run a filter kernel end to end.
+#
+#   - metal_drv_test --sweep asks the device every class against every method its
+#     protocols require; the counts are the driver's coverage table.
+#
+/redwood/bin/rwtouch wait 22
+/redwood/bin/metal_props show
+/redwood/bin/metal_props on
+/redwood/bin/metal_test
+/redwood/bin/metal_drv_test --sweep
