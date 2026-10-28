@@ -81,6 +81,26 @@ fi
 export PATH=$B/venv/bin:$PATH
 
 # the compiler is the kernel's wrapper: it names the target (arm64-apple-ios) and the linker (ld64)
+# zlib: freedreno's rd_output hard-requires it (freedreno_rd_output.h includes <zlib.h>
+# unconditionally, gz* symbols unreferenced-guarded), so it cannot be disabled. meson >=1.1's
+# ZlibSystemDependency probe is fragile in cross builds (R34 CI run 40613869928: "Could not get
+# define 'ZLIB_VERSION'"), so hand meson the SDK's own zlib through pkg-config instead: a private
+# directory with ONLY zlib.pc (no host leakage -- PKG_CONFIG_LIBDIR bars /usr/lib/pkgconfig).
+SDKZ=$B/sdk-pc
+mkdir -p "$SDKZ"
+cat > "$SDKZ/zlib.pc" <<PC
+prefix=$SDK
+includedir=\${prefix}/usr/include
+libdir=\${prefix}/usr/lib
+
+Name: zlib
+Description: zlib compression library (iPhoneOS SDK)
+Version: 1.2.11
+Cflags: -I\${includedir}
+Libs: -L\${libdir} -lz
+PC
+export PKG_CONFIG_PATH="$SDKZ"
+export PKG_CONFIG_LIBDIR="$SDKZ"
 cat > cross.ini <<INI
 [binaries]
 c = ['$CC', '-arch', 'arm64', '-isysroot', '$SDK']
@@ -89,7 +109,7 @@ objc = ['$CC', '-arch', 'arm64', '-isysroot', '$SDK']
 ar = 'llvm-ar'
 ranlib = 'llvm-ranlib'
 strip = 'llvm-strip'
-pkg-config = 'false'
+pkg-config = 'pkg-config'
 
 [host_machine]
 system = 'darwin'
@@ -103,15 +123,11 @@ needs_exe_wrapper = true
 INI
 DRIVERS=${DRIVERS:-softpipe,freedreno}
 BUILD=build-${DRIVERS//,/-}
-# zlib=disabled: meson >=1.1's ZlibSystemDependency raises "Could not get define
-# 'ZLIB_VERSION'" when the cross probe of the iOS SDK's zlib.h fails (CI runner,
-# R34 round); zlib only serves compression paths we already ship without
-# (shader-cache is off, zstd off), so the library loses nothing we call.
 [ -f $BUILD/build.ninja ] || meson setup $BUILD mesa-$VERSION --cross-file cross.ini --wrap-mode=nofallback \
         --prefix=/redwood --libdir=lib --buildtype=release -Db_ndebug=true \
         -Dplatforms= -Dgallium-drivers="$DRIVERS" -Dfreedreno-kmds=msm -Dvulkan-drivers= -Dglx=disabled -Degl=disabled -Dgbm=disabled \
         -Dosmesa=true -Dllvm=disabled -Dshared-glapi=enabled -Dgles1=disabled -Dgles2=enabled -Dopengl=true \
-        -Dzstd=disabled -Dzlib=disabled -Dxmlconfig=disabled -Dexpat=disabled -Dshader-cache=disabled -Dvalgrind=disabled \
+        -Dzstd=disabled -Dxmlconfig=disabled -Dexpat=disabled -Dshader-cache=disabled -Dvalgrind=disabled \
         -Dlibunwind=disabled -Dglvnd=disabled -Dvideo-codecs= -Dtools= -Dgallium-vdpau=disabled -Dgallium-va=disabled \
         -Dgallium-xa=disabled -Dlmsensors=disabled -Dbuild-tests=false > meson-setup.log
 ninja -C $BUILD > ninja.log
