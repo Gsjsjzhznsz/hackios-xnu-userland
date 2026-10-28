@@ -59,12 +59,12 @@ cd "$B"
 # the rest): the sources are taken from the archive again and everything is built anew, about a minute.
 PATCHES=$(cat "$ROOT"/tools/mesa/*.patch | sha256sum | cut -d' ' -f1)
 if [ ! -d mesa-$VERSION ] || [ "$(cat mesa-$VERSION/.redwood-patches 2>/dev/null)" != "$PATCHES" ]; then
-	[ -f mesa-$VERSION.tar.xz ] || curl -sL --fail -o mesa-$VERSION.tar.xz https://archive.mesa3d.org/mesa-$VERSION.tar.xz
-	echo "$SHA256  mesa-$VERSION.tar.xz" | sha256sum -c --quiet
-	rm -rf mesa-$VERSION build-*
-	tar xJf mesa-$VERSION.tar.xz
-	for p in "$ROOT"/tools/mesa/*.patch; do patch -s --no-backup-if-mismatch -d mesa-$VERSION -p1 < "$p"; done
-	echo "$PATCHES" > mesa-$VERSION/.redwood-patches
+        [ -f mesa-$VERSION.tar.xz ] || curl -sL --fail -o mesa-$VERSION.tar.xz https://archive.mesa3d.org/mesa-$VERSION.tar.xz
+        echo "$SHA256  mesa-$VERSION.tar.xz" | sha256sum -c --quiet
+        rm -rf mesa-$VERSION build-*
+        tar xJf mesa-$VERSION.tar.xz
+        for p in "$ROOT"/tools/mesa/*.patch; do patch -s --no-backup-if-mismatch -d mesa-$VERSION -p1 < "$p"; done
+        echo "$PATCHES" > mesa-$VERSION/.redwood-patches
 fi
 # ours, kept in the repository: always the current ones
 rm -rf mesa-$VERSION/src/redwood-drm
@@ -75,8 +75,8 @@ cp -r "$ROOT/tools/mesa/redwood-drm" mesa-$VERSION/src/redwood-drm
 rm -rf mesa-$VERSION/src/compiler/air
 cp -r "$ROOT/tools/mesa/air" mesa-$VERSION/src/compiler/air
 if [ ! -x venv/bin/python3 ]; then
-	python3 -m venv venv
-	venv/bin/pip -q install mako pyyaml packaging
+        python3 -m venv venv
+        venv/bin/pip -q install mako pyyaml packaging
 fi
 export PATH=$B/venv/bin:$PATH
 
@@ -103,34 +103,38 @@ needs_exe_wrapper = true
 INI
 DRIVERS=${DRIVERS:-softpipe,freedreno}
 BUILD=build-${DRIVERS//,/-}
+# zlib=disabled: meson >=1.1's ZlibSystemDependency raises "Could not get define
+# 'ZLIB_VERSION'" when the cross probe of the iOS SDK's zlib.h fails (CI runner,
+# R34 round); zlib only serves compression paths we already ship without
+# (shader-cache is off, zstd off), so the library loses nothing we call.
 [ -f $BUILD/build.ninja ] || meson setup $BUILD mesa-$VERSION --cross-file cross.ini --wrap-mode=nofallback \
-	--prefix=/redwood --libdir=lib --buildtype=release -Db_ndebug=true \
-	-Dplatforms= -Dgallium-drivers="$DRIVERS" -Dfreedreno-kmds=msm -Dvulkan-drivers= -Dglx=disabled -Degl=disabled -Dgbm=disabled \
-	-Dosmesa=true -Dllvm=disabled -Dshared-glapi=enabled -Dgles1=disabled -Dgles2=enabled -Dopengl=true \
-	-Dzstd=disabled -Dxmlconfig=disabled -Dexpat=disabled -Dshader-cache=disabled -Dvalgrind=disabled \
-	-Dlibunwind=disabled -Dglvnd=disabled -Dvideo-codecs= -Dtools= -Dgallium-vdpau=disabled -Dgallium-va=disabled \
-	-Dgallium-xa=disabled -Dlmsensors=disabled -Dbuild-tests=false > meson-setup.log
+        --prefix=/redwood --libdir=lib --buildtype=release -Db_ndebug=true \
+        -Dplatforms= -Dgallium-drivers="$DRIVERS" -Dfreedreno-kmds=msm -Dvulkan-drivers= -Dglx=disabled -Degl=disabled -Dgbm=disabled \
+        -Dosmesa=true -Dllvm=disabled -Dshared-glapi=enabled -Dgles1=disabled -Dgles2=enabled -Dopengl=true \
+        -Dzstd=disabled -Dzlib=disabled -Dxmlconfig=disabled -Dexpat=disabled -Dshader-cache=disabled -Dvalgrind=disabled \
+        -Dlibunwind=disabled -Dglvnd=disabled -Dvideo-codecs= -Dtools= -Dgallium-vdpau=disabled -Dgallium-va=disabled \
+        -Dgallium-xa=disabled -Dlmsensors=disabled -Dbuild-tests=false > meson-setup.log
 ninja -C $BUILD > ninja.log
 # air_run draws with a translated Metal shader and reads the pixels back; it is
 # the only way to find out whether the Adreno takes work that did not come from
 # the window server. Built only when asked, since it is a test program.
 if [ "${AIR:-}" = 1 ]; then
-	ninja -C $BUILD src/gallium/drivers/freedreno/air_run >> ninja.log
-	cp $BUILD/src/gallium/drivers/freedreno/air_run out/air_run
-	echo "mk-mesa.sh: $B/out/air_run ($(stat -c %s out/air_run) bytes)"
-	# and the same path as a library, which is not a test program: the Metal driver links
-	# against it to compile the bitcode Metal hands a function. Stripped and named the way
-	# libOSMesa is below -- -x keeps the global symbols, which here are the rwa_* of
-	# tools/mesa/air/air_metal.h, and the install name has to be the path on the device
-	# because meson's own is @rpath.
-	ninja -C $BUILD src/gallium/drivers/freedreno/libredwoodair.dylib >> ninja.log
-	llvm-strip -x -o out/libredwoodair.dylib $BUILD/src/gallium/drivers/freedreno/libredwoodair.dylib
-	install_name_tool -id /redwood/lib/libredwoodair.dylib out/libredwoodair.dylib
-	echo "mk-mesa.sh: $B/out/libredwoodair.dylib ($(stat -c %s out/libredwoodair.dylib) bytes," \
-		"$(nm -gU out/libredwoodair.dylib | grep -c ' _rwa_') rwa_* functions)"
-	# what this library was built from, so userland/build.sh can tell that it is older than the
-	# sources and come back here instead of shipping it beside a driver that disagrees with it
-	cat "$ROOT"/tools/mesa/air/* | sha256sum > out/built-from-air
+        ninja -C $BUILD src/gallium/drivers/freedreno/air_run >> ninja.log
+        cp $BUILD/src/gallium/drivers/freedreno/air_run out/air_run
+        echo "mk-mesa.sh: $B/out/air_run ($(stat -c %s out/air_run) bytes)"
+        # and the same path as a library, which is not a test program: the Metal driver links
+        # against it to compile the bitcode Metal hands a function. Stripped and named the way
+        # libOSMesa is below -- -x keeps the global symbols, which here are the rwa_* of
+        # tools/mesa/air/air_metal.h, and the install name has to be the path on the device
+        # because meson's own is @rpath.
+        ninja -C $BUILD src/gallium/drivers/freedreno/libredwoodair.dylib >> ninja.log
+        llvm-strip -x -o out/libredwoodair.dylib $BUILD/src/gallium/drivers/freedreno/libredwoodair.dylib
+        install_name_tool -id /redwood/lib/libredwoodair.dylib out/libredwoodair.dylib
+        echo "mk-mesa.sh: $B/out/libredwoodair.dylib ($(stat -c %s out/libredwoodair.dylib) bytes," \
+                "$(nm -gU out/libredwoodair.dylib | grep -c ' _rwa_') rwa_* functions)"
+        # what this library was built from, so userland/build.sh can tell that it is older than the
+        # sources and come back here instead of shipping it beside a driver that disagrees with it
+        cat "$ROOT"/tools/mesa/air/* | sha256sum > out/built-from-air
 fi
 
 llvm-strip -x -o out/libOSMesa.8.dylib $BUILD/src/gallium/targets/osmesa/libOSMesa.8.dylib
@@ -140,4 +144,4 @@ cp mesa-$VERSION/src/mapi/glapi/registry/gl.xml out/gl.xml
 # (userland/build.sh comes here again when this no longer matches)
 cat "$ROOT"/tools/mesa/*.patch "$ROOT"/tools/mesa/redwood-drm/* | sha256sum > out/built-from
 echo "mk-mesa.sh: Mesa $VERSION ($DRIVERS): $B/out/libOSMesa.8.dylib, $(stat -c %s out/libOSMesa.8.dylib) bytes," \
-	"$(wc -l < out/exported-gl.txt) gl* functions"
+        "$(wc -l < out/exported-gl.txt) gl* functions"
