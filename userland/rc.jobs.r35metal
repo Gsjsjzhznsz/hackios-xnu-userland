@@ -1,0 +1,37 @@
+# Commands run by the launchd job com.redwood.demo (RC_JOBS=rc.jobs.r35metal).
+#
+# R35, the Metal round, on the phone: the GL pieces of R34 ride in the volume still, and
+# GL=1's own library (libredwood-gl.dylib) rides now too -- the window server takes the GLES
+# road through it the moment the boot reaches it.  The NEW thing this list measures is the
+# Metal side, and it measures it in the one order that keeps the system safe:
+#
+#   - the wait first: SpringBoard up, the window server holding the GPU, the system calm.
+#     A boot's early minutes are when launchd is still starting daemons; a discovery
+#     property put on the service while they start would hand every one of them a device
+#     of ours the moment it first asks Metal for one (docs/metal.md 10.14: Metal's checks
+#     are asserts -- a daemon handed a device that cannot serve it does not degrade, it
+#     aborts, and launchd restarts an aborting daemon -- a loop).  Nothing here persists:
+#     the properties live only in the registry, so the next boot is clean without them.
+#
+#   - metal_props puts the two discovery properties on the IOAcceleratorES service (the
+#     kernel must be booted with metal=1 to accept them: iokit/Kernel/MiniIOMobileFramebuffer.cpp).
+#     From that moment every process that asks Metal composes
+#     /System/Library/Extensions/RedwoodMetal.bundle (the link the volume carries), takes
+#     our class and gets RedwoodMetalDevice -- all five steps of the discovery chain, done
+#     by Metal itself, for every caller from here on.
+#
+#   - metal_test walks the chain once more on the record: the service, the two properties,
+#     the bundle, the class under _MTLDevice, the device -- and then asks CoreImage to run
+#     a filter kernel, the one thing here that says whether image processing above Metal
+#     works end to end.
+#
+#   - metal_drv_test --sweep asks the device every class against every method its
+#     protocols require.  The counts are the driver's coverage table, taken in the same
+#     run as everything above; a crash here is caught by the log's own flushing and says
+#     which class was being asked.
+#
+/redwood/bin/rwtouch wait 22
+/redwood/bin/metal_props show
+/redwood/bin/metal_props on
+/redwood/bin/metal_test
+/redwood/bin/metal_drv_test --sweep
