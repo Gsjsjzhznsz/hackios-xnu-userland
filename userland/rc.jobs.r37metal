@@ -1,0 +1,67 @@
+# Commands run by the launchd job com.redwood.demo (RC_JOBS=rc.jobs.r37metal).
+#
+# R37, the plague-containment round, on the phone: everything rides R36's bytes STILL --
+# the kernel is R33's (420f4b71...), sbin/init is R36's union init (a5ef0c3, byte-identical
+# in the volume), the cmdline is the R35 set verbatim -- the ONE variable this round ships
+# is this file.
+#
+# The R36 device log (4502 lines, read in full) proved BOTH halves of the discovery fix and
+# ONE new wound:
+#
+#   - J3 CLOSED: the union mount put the bundle exactly where Metal's step 3 composes it
+#     ("metal_props: Metal would open /System/Library/Extensions/RedwoodMetal.bundle: it is
+#     there"; metal_test saw IOAcceleratorES "sgx" carrying the two properties and
+#     RedwoodGPU "RedwoodGPU" in the registry).
+#
+#   - THE PLAGUE (this round's subject): with the properties ON and the bundle findable,
+#     every process on the system that asks Metal walks the whole chain -- 64 SIGBUS lines
+#     in one boot: metal_test (inside MTLCreateSystemDefaultDevice), the sweep (killed
+#     before its first print), backboardd (NINE launches, each dying at the same
+#     window-server instruction -- "kIOMFBSourceLimitsKey missing!" then signal 10 at
+#     0x2256e3d34), SpringBoard, lsd (22 launches), mobilegestalt.xpc, analyticsd,
+#     runningboardd.  The panel stayed on the kernel's own GPU test picture (orange /
+#     white / blue -- adreno step 22's "A PICTURE DRAWN BY THE GPU IS ON THE PANEL"),
+#     because no daemon survived long enough to submit a frame over it: the "stuck at
+#     three colors" the round went out on.
+#
+#   The reference measured this exact hazard (docs/metal.md 10.14, and rc.ios.metal's own
+#   comment): a discovery property put on the service hands EVERY future asker a device of
+#   ours, and Metal's conditions on a device object are asserts, not soft refusals; the
+#   reference's first props-on boot was deliberately run with launchd UNBORN ("launchd is
+#   never born, so no daemon can ask Metal and meet a half-made device"), and its list ends
+#   with "metal_props off -- the properties are removed again on the line after it, so
+#   nothing outlives this list".  Our port boots launchd (it is the SpringBoard port), so
+#   the containment is TEMPORAL instead of structural: the properties stand ONLY while this
+#   list runs, and the closing lines take them off again.  Processes started after that go
+#   back to the software road -- Metal returns nil before it even composes the bundle path,
+#   the R35 behavior a full boot demonstrably survives (zero SIGBUS in R35's 3019 lines).
+#
+# The list is R36's rc.jobs.r36metal VERBATIM plus the two closing lines:
+#
+#   - the wait first: SpringBoard up, the window server holding the GPU, the system calm
+#     (rc.jobs.r35metal's own comment carries the reasoning; unchanged).
+#
+#   - metal_props show / on: the two discovery properties onto the IOAcceleratorES service
+#     (the kernel must ride metal=1 for the write to be taken: MiniIOMobileFramebuffer.cpp).
+#
+#   - metal_test: the five discovery steps on the record.  EXPECTED in R37: the same
+#     frontier death as R36 (step 3 opens the bundle, the caller dies inside
+#     MTLCreateSystemDefaultDevice) -- that death IS the measurement now, and it is
+#     contained by the props-off below: the redwood runner reports the child's signal and
+#     moves to the next line (R36's log shows it doing exactly that).
+#
+#   - metal_drv_test --sweep: same expectation, same containment.
+#
+#   - metal_props off: THE round's line -- the reference's own way out ("An empty string
+#     removes a property rather than setting it", IOAcceleratorES::setProperties).
+#
+#   - metal_props show: the verdict that both read "(none)" -- the proof that nothing
+#     outlives the list.
+#
+/redwood/bin/rwtouch wait 22
+/redwood/bin/metal_props show
+/redwood/bin/metal_props on
+/redwood/bin/metal_test
+/redwood/bin/metal_drv_test --sweep
+/redwood/bin/metal_props off
+/redwood/bin/metal_props show
