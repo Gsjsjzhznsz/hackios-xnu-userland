@@ -1,0 +1,49 @@
+# Commands run by the launchd job com.redwood.demo (RC_JOBS=rc.jobs.r39quiet).
+#
+# R39, the GLES-only lockscreen round: the boot path NEVER puts the Metal discovery
+# properties on the IOAcceleratorES service.  Structural, not temporal -- R38's device log
+# (4803 lines, read in full) killed the containment idea for good:
+#
+#   - R37's own verdict stands (J1 SENTINEL ESTABLISHED, the r38 release body records it):
+#     inside the props window the chain completed -- RedwoodGPU client opened (0),
+#     MTLCreateSystemDefaultDevice() = "Adreno 7c+ Gen 3 (chip 0x6040001, Redwood)", class
+#     RedwoodMetalDevice, the 11-class 420+-method sweep answered.  The discovery chain and
+#     our RedwoodGPU user client are ALIVE.
+#
+#   - But R38 proved the window itself is a lottery: analyticsd walked first and died at
+#     the frontier (signal 10 at 0x1e32e491c seconds after metal_props on, before
+#     metal_test's own crash), and after that first frontier death EVERY process born
+#     afterwards died in dyld -- lsd respawned 78 times to the end of the log INCLUDING
+#     with the properties already OFF (spawned 00:03:43.036, dead 00:03:43.057 -- 21 ms),
+#     analyticsd x4, mobilegestalt.xpc, and backboardd itself at 00:04:56 on the first
+#     touch ("signal 10 at 0x1e32e491c, pc 0x18dcd091c" right after the event server asked
+#     for AccurateMaxDigitizerPressureValue).  R36 saw the same shape (mobilegestalt.xpc
+#     died BEFORE metal_test; backboardd x9).  One frontier death poisons the boot for
+#     every page-in that follows; whether the walker survives (R37) or dies (R36/R38) is
+#     not ours to choose.  The white Apple = CA's boot backdrop frozen at frame 4 / flip 3
+#     because mobilegestalt.xpc and lsd -- SpringBoard's own dependencies -- were the
+#     plague's casualties.
+#
+#   - The reference reached the same conclusion from the other side: docs/RAPHAEL.md
+#     2026-10-27, "upstream has merged the userland, removed Metal" -- GLES-only, and their
+#     phone-proven lockscreen/UI/GPU round (2026-10-23) ran backboardd on "the project's
+#     existing GLES CoreAnimation path" all along.  Our GLES road is the same and is
+#     ALREADY PROVEN on the device: R38's log has redwood-gl frames 1..4 finishing cleanly
+#     (finish_update -> 0) and the kernel display latching flips 1..3 -- the whole
+#     compositor pipeline works; it was starved, not broken.
+#
+# So this list is the pre-Metal probe set VERBATIM (the base rc.jobs, R34-lineage, last
+# ridden by a shipped volume before the metal rounds), and NOTHING of the discovery chain
+# runs: no metal_props, no metal_test, no sweep.  Metal's J1 verdict is already on the
+# record from R37; re-measuring it costs a poisoned boot.  The WiFi half of R39 rides the
+# kernel's wifi=1 (the raphael branch needs no daemon and dies quietly when the modem
+# firmware is absent from the RAM image -- this volume carries none).
+#
+/redwood/bin/hello_dyn started by launchd
+/redwood/bin/svc_test
+/redwood/bin/surf_test
+/bin/ps -A
+/redwood/bin/mg_test
+# the processors: how many, and -- once the system has settled -- whether they work at the same time
+/redwood/bin/cpu_test
+/redwood/bin/cpu_test 240 &
